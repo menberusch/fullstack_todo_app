@@ -1,7 +1,8 @@
 import React, { Component } from 'react';
 import TodoForm from './TodoForm';
 import TodoItem from './TodoItem';
-import './TodoList.css'
+import * as apiCalls from './api';
+import './TodoList.css';
 
 const API_URL = '/api/todos/';
 
@@ -15,49 +16,28 @@ class TodoList extends Component {
     this.addTodo = this.addTodo.bind(this);
   }
 
-  componentDidMount() {
-    this.fetchAPI(API_URL)
-    .then(todos => this.setState({todos}));
+  async componentDidMount() {
+    let todos = await apiCalls.getTodos();
+    this.setState({todos});
   }
 
-  fetchAPI(api_url, obj) {
-    return fetch(api_url, obj)
-    .then(resp => {
-      if(!resp.ok) {
-        if(resp.status >= 400 && resp.status < 500) {
-          return resp.json().then(data => {
-            let err = {errorMessage: data.message};
-            throw err;
-          });
-        } else {
-          let err = {errorMessage: "Please try again later, server is not responding."};
-          throw err;
-        }
-      }
-      return resp.json();
-    });
+  async addTodo(val) {
+    let newTodo = await apiCalls.createTodo(val); 
+    this.setState({todos: [...this.state.todos, newTodo]})
   }
 
-  addTodo(val) {
-    this.fetchAPI(API_URL, {
-      method: 'POST',
-      headers: new Headers({
-        'Content-Type': 'application/json'
-      }),
-      body: JSON.stringify({name: val})
-    })
-    .then(newTodo => {
-      this.setState({todos: [...this.state.todos, newTodo]})
-    });
+  async deleteTodo(id) {
+    await apiCalls.deleteTodo(id);
+    const todos = this.state.todos.filter(todo => todo._id !== id);
+    this.setState({todos});
   }
 
-  deleteTodo(id) {
-    const deleteURL = API_URL + id;
-    this.fetchAPI(deleteURL, {method: 'DELETE'})
-    .then(() => {
-      const todos = this.state.todos.filter(todo => todo._id !== id);
-      this.setState({todos});
-    });
+  async toggleTodo(todo) {
+    let updatedTodo = await apiCalls.updateTodo(todo);
+    const todos = this.state.todos.map(t => (
+      t._id === updatedTodo._id ? {...t, completed: !t.completed} : t
+    ));
+    this.setState({todos});
   }
 
   render() {
@@ -65,7 +45,8 @@ class TodoList extends Component {
       <TodoItem
         key={todo._id} 
         {...todo}
-        deleteTodo={this.deleteTodo.bind(this, todo._id)}
+        onDelete={this.deleteTodo.bind(this, todo._id)}
+        onToggle={this.toggleTodo.bind(this, todo)} 
       />
     ));
     return (
